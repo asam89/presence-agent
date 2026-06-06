@@ -1,0 +1,41 @@
+name: Deploy to OCI Ampere
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            set -e
+
+            REPO_DIR="$HOME/presence-agent"
+
+            # First-time setup: clone if missing
+            if [ ! -d "$REPO_DIR/.git" ]; then
+              git clone https://github.com/asam89/presence-agent.git "$REPO_DIR"
+            fi
+
+            cd "$REPO_DIR"
+
+            # Pull latest code
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Ensure venv exists and install deps
+            if [ ! -d "$REPO_DIR/venv" ]; then
+              python3.12 -m venv "$REPO_DIR/venv"
+            fi
+
+            "$REPO_DIR/venv/bin/pip" install --quiet -r requirements.txt
+
+            echo "Deployed commit: $(git rev-parse --short HEAD)"
